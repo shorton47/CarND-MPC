@@ -17,8 +17,8 @@ constexpr double pi() { return M_PI; }
 // Constants Section !!!
 // TODO: Set the timestep length and duration
 //-----
-size_t N = 75;
-double dt = 0.05;
+size_t N = 100;    // 75   40
+double dt = 0.03; //  .05   .05
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -35,7 +35,7 @@ const double Lf = 2.67;
 // NOTE: feel free to play around with this
 // or do something completely different
 // Reference Car Velocity in mph
-double ref_v = 40;
+double ref_v = 20;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -111,6 +111,13 @@ public:
       
       // The rest of the constraints
       for (int t = 1; t < N; t++) {
+          AD<double> x0 = vars[x_start + t - 1];
+          AD<double> y0 = vars[y_start + t - 1];
+          AD<double> psi0 = vars[psi_start + t - 1];
+          AD<double> v0 = vars[v_start + t - 1];
+          AD<double> cte0 = vars[cte_start + t - 1];
+          AD<double> epsi0 = vars[epsi_start + t - 1];
+
           AD<double> x1 = vars[x_start + t];
           AD<double> y1 = vars[y_start + t];
           AD<double> psi1 = vars[psi_start + t];
@@ -118,18 +125,12 @@ public:
           AD<double> cte1 = vars[cte_start + t];
           AD<double> epsi1 = vars[epsi_start + t];
           
-          AD<double> x0 = vars[x_start + t - 1];
-          AD<double> y0 = vars[y_start + t - 1];
-          AD<double> psi0 = vars[psi_start + t - 1];
-          AD<double> v0 = vars[v_start + t - 1];
-          AD<double> cte0 = vars[cte_start + t - 1];
-          AD<double> epsi0 = vars[epsi_start + t - 1];
-          
           // Only consider the actuation at time t.
           AD<double> delta0 = vars[delta_start + t - 1];
           AD<double> a0 = vars[a_start + t - 1];
           
-          AD<double> f0 = coeffs[0] + coeffs[1] * x0;
+          // THIS IS UNIQUE _ WHERE DID THIS COME FROM?? CHECK PSIDES0!!!!!!!
+          AD<double> f0 = coeffs[0] + coeffs[1]*x0 + coeffs[2]*x0*x0 + coeffs[3]*x0*x0*x0;
           AD<double> psides0 = CppAD::atan(coeffs[1]);
           
           // Here's `x` to get you started.
@@ -147,6 +148,8 @@ public:
           // epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
           //---
           // TODO: Setup the rest of the model constraints
+          // Global Kinematic Model
+          // 2!!!!!
           fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
           fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
           fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
@@ -175,7 +178,7 @@ MPC::~MPC() {}
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     
     bool ok = true;
-    size_t i;
+    //size_t i;
     typedef CPPAD_TESTVECTOR(double) Dvector;
 
     double x = state[0];
@@ -225,19 +228,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     // Set all non-actuators upper and lowerlimits
     // to the max negative and positive values.
     for (int i = 0; i < delta_start; i++) {
-        //vars_lowerbound[i] = -1.0e19;
-        //vars_upperbound[i] = 1.0e19;
-        vars_lowerbound[i] = -__DBL_EPSILON__;
-        vars_upperbound[i] = __DBL_EPSILON__;
+        vars_lowerbound[i] = -1.0e19;
+        vars_upperbound[i] = 1.0e19;
+        //vars_lowerbound[i] = -__DBL_EPSILON__;
+        //vars_upperbound[i] = __DBL_EPSILON__;
     }
     
     // The upper and lower limits of delta are set to -25 and 25
     // degrees (values in radians).
     // NOTE: Feel free to change this to something else.
     for (int i = delta_start; i < a_start; i++) {
-        //vars_lowerbound[i] = -0.436332;
-        vars_lowerbound[i] = deg2rad(-25.0);
-        vars_upperbound[i] = deg2rad(25.0);
+        vars_lowerbound[i] = -0.436332;
+         vars_upperbound[i] = 0.436332;
+        //vars_lowerbound[i] = deg2rad(-25.0);
+        //vars_upperbound[i] = deg2rad(25.0);
     }
     
     // Acceleration/decceleration upper and lower limits.
@@ -300,11 +304,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
       constraints_upperbound, fg_eval, solution);
 
   // Check some of the solution values
-  ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
+   // bool ok = true;
+    ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
 
   // Cost
   auto cost = solution.obj_value;
-  std::cout << "Cost " << cost << std::endl;
+  cout << "MPC: Cost=" << cost << endl;
 
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.
@@ -312,11 +317,22 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
     
+    /*
     return {solution.x[x_start + 1],   solution.x[y_start + 1],
         solution.x[psi_start + 1], solution.x[v_start + 1],
         solution.x[cte_start + 1], solution.x[epsi_start + 1],
         solution.x[delta_start],   solution.x[a_start]};
+    */
     
+    vector<double> output;
     
-  //return {};
+    output.push_back(solution.x[delta_start]); // First actuation
+    output.push_back(solution.x[a_start]);     // Second actuation
+    
+    for (int i=1; i<N; i++) {
+        output.push_back(solution.x[x_start + i]);
+        output.push_back(solution.x[y_start + i]);
+    
+    }
+    return output;
 }

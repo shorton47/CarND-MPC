@@ -175,7 +175,7 @@ int main() {
   
     uWS::Hub h;
     MPC mpc;  // MPC CLASS is initialized here!
-    //int iters = 75;
+    int iters = 20;
     
     //-----
     // Message Handler Section before start
@@ -183,14 +183,14 @@ int main() {
     //----
     
     // Message hook & processing from Udacity Simulator
-    h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+    h.onMessage([&mpc,&iters](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
         
-        int iters = 5;
+        //int iters = 5;
         
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message. The 2 signifies a websocket event
         string sdata = string(data).substr(0, length);
-        cout << sdata << endl;
+        //cout << sdata << endl;
         if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
             string s = hasData(sdata);
             if (s != "") {
@@ -241,6 +241,7 @@ int main() {
                      
                     
                     auto coeffs = polyfit(ptsx_transform,ptsy_transform,3);
+                    cout << "Main: coeffs=" << coeffs << endl;
                     //Eigen::VectorXd coeffs = polyfit(ptsx_v_plan,ptsy_v_plan,3);
                     
                     // 3. Prepare data for Model Prediction C solver
@@ -249,18 +250,19 @@ int main() {
                     //auto coeffs = polyfit(<#Eigen::VectorXd xvals#>, <#Eigen::VectorXd yvals#>, <#int order#>)(ptsx, ptsy, 2);
                     
                     
-                    double y2 = polyeval(coeffs,px);
-                    cout << "py=" << py << " y2=" << y2 << endl;
+                    //double y2 = polyeval(coeffs,px);
+                    //cout << "Main: py=" << py << " y2=" << y2 << endl;
                     //double cte = polyeval(coeffs, px) - py;
                     double cte = polyeval(coeffs, 0);
                     //double epsi = psi - atan(coeffs[1]);
                     double epsi = -atan(coeffs[1]);
-                    cout << "CTE=" << cte << " epsi=" << epsi << endl;
+                    cout << "Main: cte=" << cte << " epsi=" << epsi << endl;
                     
                     
                     Eigen::VectorXd state(6);
                     //state << px, py, psi, v, cte, epsi;
                     state << 0, 0, 0, v, cte, epsi;
+                    //state << px, py, psi, v, cte, epsi;
                     
                     std::vector<double> x_vals = {state[0]};
                     std::vector<double> y_vals = {state[1]};
@@ -276,11 +278,13 @@ int main() {
                     double throttle_value;
 
 
-                    for (size_t i = 0; i < iters; i++) {
-                        std::cout << "Iteration " << i << std::endl;
+                   // for (size_t i = 0; i < iters; i++) {
+                        //std::cout << "Main: Iteration " << i << std::endl;
+                        
                         
                         auto vars = mpc.Solve(state, coeffs);
-                        
+                    
+                    /*
                         x_vals.push_back(vars[0]);
                         y_vals.push_back(vars[1]);
                         psi_vals.push_back(vars[2]);
@@ -292,6 +296,7 @@ int main() {
                         a_vals.push_back(vars[7]);
                         
                         state << vars[0], vars[1], vars[2], vars[3], vars[4], vars[5];
+                         state << 0, 0, 0, vars[3], vars[4], vars[5];
                         std::cout << "x = " << vars[0] << std::endl;
                         std::cout << "y = " << vars[1] << std::endl;
                         std::cout << "psi = " << vars[2] << std::endl;
@@ -302,15 +307,16 @@ int main() {
                         std::cout << "a = " << vars[7] << std::endl;
                         std::cout << std::endl;
                         
-                        steer_value = vars[2];    // Update estimate for steer angle
-                        throttle_value = vars[7];  // Udate estimate for throttle
+                        //steer_value = vars[2];    // Update estimate for steer angle
+                        //throttle_value = vars[7];  // Udate estimate for throttle
                         
-                        steer_value = -vars[0]/(deg2rad(25));
+                     */
+                        steer_value = -vars[0]/(deg2rad(25));  // Multiply by -1 because turn in reverse in simulator
                         throttle_value = vars[1];
-
                         
+                        cout << "MPC: Sol steer=" << steer_value << " throttle=" << throttle_value << endl;
                         
-                    }
+                    //}
 
                     //steer_value = -vars[0]/(deg2rad(25));
                     //throttle_value = vars[1];
@@ -321,7 +327,7 @@ int main() {
                     // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
                     //steer_value = 0.0;
                     msgJson["steering_angle"] = steer_value;
-                    //throttle_value = .05;
+                    throttle_value = .1;
                     msgJson["throttle"] = throttle_value;
 
                     //Display the MPC predicted trajectory
@@ -348,7 +354,7 @@ int main() {
                     msgJson["next_x"] = ptsx_v;
                     msgJson["next_y"] = ptsy_v;
 
-                    // NICE DEBUG
+                    // Message to Simulator Server
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
                    // std::cout << msg << std::endl;
           
