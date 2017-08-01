@@ -164,7 +164,7 @@ int main() {
                 
                 if (event == "telemetry") {
                     
-                    // 0. Identify incoming data (j[1] is the data JSON object)
+                    // #0. Identify incoming data (j[1] is the data JSON object)
                     vector<double> ptsx = j[1]["ptsx"];  // Planned x path (waypoints) in map space (meters)
                     vector<double> ptsy = j[1]["ptsy"];  // Planned y path (waypoints) in map space (meters)
                     double px = j[1]["x"];               // Vehicle x position in map space (meters)
@@ -172,15 +172,13 @@ int main() {
                     double psi = j[1]["psi"];            // Vehicle orientation in map space (radians)
                     double v = j[1]["speed"];            // Vehicle speed (mph) orientation in map space
 
-                    // 1. Convert Planned Path line (Waypoints) from World/Map space to Vehicle space
+                    // #1. Convert Planned Path line (Waypoints) from World/Map space to Vehicle space (w/ vehicle angle)
                     vector<double> ptsx_v;  // Waypoints x in vehicle space
                     vector<double> ptsy_v;  // Waypoints y in vehicle space
-                    
-                    // Converts waypoints to vehicle space with vehicle angle
                     ConvertMapWaypointsToVehicleCoord(ptsx,ptsy,psi,px,py,ptsx_v,ptsy_v);
 
                     
-                    // 2. Fit a smooth polynomial (3rd order) to planned path (in vehicle coords now)
+                    // #2. Fit a smooth polynomial (3rd order) to planned path (in vehicle coords now)
                     // This is a trick to convert a <vector> to Eigen::VectorXd for poly fit (from discussion board)
                     double *ptrx = &ptsx_v[0];
                     double *ptry = &ptsy_v[0];
@@ -189,79 +187,57 @@ int main() {
                     auto coeffs = polyfit(ptsx_transform,ptsy_transform,3);
                     
             
-                    // 3. Prepare data for Model Prediction Control (MPC) Solver
+                    // #3. Prepare data for Model Prediction Control (MPC) Solver
                     // Need cross track error (cte) and steering angle error (epsi)
                     double cte = polyeval(coeffs, 0);  // cte is vehicle location at x=0 of polyfit
                     double epsi = -atan(coeffs[1]);    // !!!FINISH
-                    cout << "Main: cte=" << cte << " epsi=" << epsi << endl;
+                    cout << "Main: Current cte=" << cte << " epsi=" << epsi << endl;
                     
                     // Load state vector for MPC solver (in vehicle coordinates which has x,y=0 & angle=0 by def.)
                     Eigen::VectorXd state(6);
                     state << 0, 0, 0, v, cte, epsi;  // state << px, py, psi, v, cte, epsi;
                     
                     // Call MPC Solver!
-                    auto vars = mpc.Solve(state, coeffs);
-                    
                     // vars returned: actuations adjust: vars[0] = delta, vars[1] = a
                     // then, vars[2]=x, vars[3]=y, vars[4]=psi, vars[5]=v, vars[6]=cte, vars[7]=epsi
+                    auto vars = mpc.Solve(state, coeffs);
+                    
                     // Calculate steering angle and throttle using MPC. Both are in between [-1, 1].
-                    double steer_value = -vars[0]/(deg2rad(25));  // Normalize by max angle & mult by -1 because turn is reversed in simulator
+                    double steer_value = -vars[0]/(deg2rad(25));  // Norma by max angle & mult by -1 bcause turn is reversed in sim
                     double throttle_value = vars[1];
                     cout << "Main: MPC solution, steer adjust=" << steer_value << " throttle=" << throttle_value << endl;
                     
 
-                    
+                    // #4. Calcs done. Load message for Simulator Server
                     json msgJson;
-                    // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
-                    // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-                    //steer_value = 0.0;
                     msgJson["steering_angle"] = steer_value;
-                    //throttle_value = .1;
                     msgJson["throttle"] = throttle_value;
 
-                    //Display the MPC predicted trajectory
+                    // Load MPC predicted trajectory. This will display green line in vehicle space
                     vector<double> mpc_x_vals;
                     vector<double> mpc_y_vals;
-                    
-                    for (int i=2; i<vars.size(); i=i+2) {  // x & y pos are after the actuator values at the front of array
+                    for (int i=2; i<vars.size(); i=i+2) { // x&y pos are after the actuator values that are at the front of array
                         mpc_x_vals.push_back(vars[i]);
                         mpc_y_vals.push_back(vars[i+1]);
                     }
-                    
-                    //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-                    // the points in the simulator are connected by a Green line
-
                     msgJson["mpc_x"] = mpc_x_vals;
                     msgJson["mpc_y"] = mpc_y_vals;
 
-                    //Display the waypoints/reference line
+                    // Load Waypoints/reference line. This will display yellow line
+                    // Use vehicle space polyfit
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
-
-                    
-                    //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-                    // the points in the simulator are connected by a Yellow line
-
-                    /*
+                    for (int i=1;i<40;i++ ) {
+                        next_x_vals.push_back(i*2.0);
+                        next_y_vals.push_back(polyeval(coeffs,i*2.0));
+                    }
                     msgJson["next_x"] = next_x_vals;
                     msgJson["next_y"] = next_y_vals;
-                    */
-                    
-                    ptsx_v.clear();
-                    ptsy_v.clear();
-                    for (int i=1;i<40;i++ ) {
-                        ptsx_v.push_back(i*2.0);
-                        ptsy_v.push_back(polyeval(coeffs,i*2.0));
-                    }
-                    
-                    
-                    msgJson["next_x"] = ptsx_v;
-                    msgJson["next_y"] = ptsy_v;
+
 
                     // Message to Simulator Server
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-                   // std::cout << msg << std::endl;
-          
+                            
                     // Latency
                     // The purpose is to mimic real driving conditions where the car does actuate the commands instantly.
                     // Feel free to play around with this value but should be to drive around the track with 100ms latency.
