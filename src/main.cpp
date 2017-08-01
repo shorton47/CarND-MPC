@@ -6,18 +6,23 @@
 // State Vector for this model is: [px, py, psi, v, cte, epsi]
 //
 // NoteX: Throttle value currently fixed. Follow-on suggestion to make this in a P loop as well
+
+// Note: Since this is an event driven operation (i.e. process messages from the Udacity Simulator Server) and you have to pass
+// objects to the Websocket message handler, I have chosen to implement support routines like saving data, plotting data, etc.
+// as methods of the MPC class
+//
 //----------
 #include <math.h>
-#include <uWS/uWS.h>
+#include <uWS/uWS.h>  // Websocket library
 #include <chrono>
 #include <iostream>
 #include <thread>
 #include <vector>
-#include "Eigen-3.3/Eigen/Core"
-#include "Eigen-3.3/Eigen/QR"
+#include "Eigen-3.3/Eigen/Core"  // Open-source Eigen libary of numerical analysis routines
+#include "Eigen-3.3/Eigen/QR"    // ditto
+
 #include "MPC.h"
 #include "json.hpp"
-
 #include "utils.hpp" // My library of helper functions for this project
 
 // for convenience
@@ -131,27 +136,21 @@ void VehicleToWorld(const double &xvehicle_wrld, const double &yvehicle_wrld, co
 }
 
 
-
-
-
-
-
-
-
 //----------
 //  Main Method
 //----------
 int main() {
   
-    uWS::Hub h;
-    MPC mpc;    // MPC CLASS is initialized here!
-    
+    uWS::Hub h;      // Websocket object
+    MPC mpc;         // MPC CLASS is initialized here!
+    long count = 0;  // Master counter of messages processed for diagnostic data
+
     //-----
     // Message Handler Section before start
     //-----
     
     // onMessage is triggered each time the Udacity Simulator Server sends data through WebSocket
-    h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+    h.onMessage([&mpc,&count](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message. The 2 signifies a websocket event
@@ -163,6 +162,7 @@ int main() {
                 string event = j[0].get<string>();
                 
                 if (event == "telemetry") {
+                    count += 1;
                     
                     // #0. Identify incoming data (j[1] is the data JSON object)
                     vector<double> ptsx = j[1]["ptsx"];  // Planned x path (waypoints) in map space (meters)
@@ -198,14 +198,14 @@ int main() {
                     state << 0, 0, 0, v, cte, epsi;  // state << px, py, psi, v, cte, epsi;
                     
                     // Call MPC Solver!
-                    // vars returned: actuations adjust: vars[0] = delta, vars[1] = a
+                    // vars returned: (actuations adjust) vars[0] = delta, vars[1] = a
                     // then, vars[2]=x, vars[3]=y, vars[4]=psi, vars[5]=v, vars[6]=cte, vars[7]=epsi
                     auto vars = mpc.Solve(state, coeffs);
                     
                     // Calculate steering angle and throttle using MPC. Both are in between [-1, 1].
                     double steer_value = -vars[0]/(deg2rad(25));  // Norma by max angle & mult by -1 bcause turn is reversed in sim
                     double throttle_value = vars[1];
-                    cout << "Main: MPC solution, steer adjust=" << steer_value << " throttle=" << throttle_value << endl;
+                    cout << "Main: iter=" << count << " mpc:steer_value=" << steer_value << " throttle=" << throttle_value << endl;
                     
 
                     // #4. Calcs done. Load message for Simulator Server
@@ -227,17 +227,23 @@ int main() {
                     // Use vehicle space polyfit
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
-                    for (int i=1;i<40;i++ ) {
+                    for (int i=1; i<40; i++ ) {
                         next_x_vals.push_back(i*2.0);
                         next_y_vals.push_back(polyeval(coeffs,i*2.0));
                     }
                     msgJson["next_x"] = next_x_vals;
                     msgJson["next_y"] = next_y_vals;
 
-
+                    
+                    // #5. Save data for diagnostic plots
+                    mpc.SaveData(ptsx,ptsy,px,py);
+                    if (count == 450) mpc.PlotData();  // Diagnostic plots
+                    
+                 
+                    // -- Back to Udacity code ---
                     // Message to Simulator Server
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-                            
+                    
                     // Latency
                     // The purpose is to mimic real driving conditions where the car does actuate the commands instantly.
                     // Feel free to play around with this value but should be to drive around the track with 100ms latency.

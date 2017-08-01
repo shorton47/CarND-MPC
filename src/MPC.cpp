@@ -1,9 +1,44 @@
+//----------
+// Model Prediction Controller (MPC) Class for MPC project. This module talks to the Udacity simulator and receives data
+// back from the Simulator's vehicle through WebSocket messages. This was adapted from starter code from
+// Udacity which I modified to handle the results of the "telemetry" message.
+//
+// State Vector for this model is: [px, py, psi, v, cte, epsi]
+//
+// NoteX: Throttle value currently fixed. Follow-on suggestion to make this in a P loop as well
+
+// Note: Since this is an event driven operation (i.e. process messages from the Udacity Simulator Server) and you have to pass
+// objects to the Websocket message handler, I have chosen to implement support routines like saving data, plotting data, etc.
+// as methods of the MPC class
+//
+//
+// Note: Important Constants for this code are as follows:
+//
+//size_t N = 25;    // 16(@60) 50 (@50mph)  50  100 75   40
+//double dt = 0.03; // .05    .02          .03 .03  .05   .05
+// This is the length from front to CoG that has a similar radius.
+//const double Lf = 2.67;
+
+// NOTE: feel free to play around with this
+// or do something completely different
+// Reference Car Velocity in mph
+//double ref_v = 50;  // Up to 60 works
+//
+//
+//
+//
+//----------
 #include "MPC.h"
+#include <math.h>
 #include <cppad/cppad.hpp>
 #include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
+//#include "Eigen-3.3/Eigen/QR"
 
-#include "utils.hpp"
+#include "utils.hpp"  // My utility library
+
+#include "matplotlibcpp.h"
+namespace plt = matplotlibcpp;
 
 using CppAD::AD;
 
@@ -35,7 +70,7 @@ const double Lf = 2.67;
 // NOTE: feel free to play around with this
 // or do something completely different
 // Reference Car Velocity in mph
-double ref_v = 60;
+double ref_v = 50;  // Up to 60 works
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -48,6 +83,14 @@ size_t cte_start = v_start + N;
 size_t epsi_start = cte_start + N;
 size_t delta_start = epsi_start + N;
 size_t a_start = delta_start + N - 1;
+
+
+    vector<double> px_sav,py_sav;      // Save points for diagnostic data
+    vector<double> ptsx_sav,ptsy_sav;
+
+
+
+
 
 
 // Sub-Class ????
@@ -337,3 +380,50 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     }
     return output;
 }
+
+
+
+//
+//
+//
+void MPC::SaveData(vector<double> &ptsx, vector<double> &ptsy, double &px, double &py) {
+
+    for (int i=0; i<ptsx.size(); i++) {
+        ptsx_sav.push_back(ptsx[i]);
+        ptsy_sav.push_back(ptsy[i]);
+    }
+    
+    px_sav.push_back(px);
+    py_sav.push_back(py);
+}
+
+
+//
+//
+//
+void MPC::PlotData() {
+    
+    // Plot values
+    // NOTE: feel free to play around with this.
+    // It's useful for debugging!
+    /*
+    plt::subplot(3, 1, 1);
+    plt::title("CTE");
+    plt::plot(cte_vals);
+    plt::subplot(3, 1, 2);
+    plt::title("Delta (Radians)");
+    plt::plot(delta_vals);
+    plt::subplot(3, 1, 3);
+    plt::title("Velocity");
+    plt::plot(v_vals);
+*/
+    //plt::subplot(1, 1, 1);
+    plt::title("Car Path in Simulator");
+    plt::xlabel("X Pos");
+    plt::ylabel("Y Pos");
+    //plt::plot(ptsx_sav);
+    //plt::plot(px_sav,".-");
+    
+    plt::show();
+}
+
