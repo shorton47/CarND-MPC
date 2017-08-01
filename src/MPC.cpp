@@ -17,8 +17,8 @@ constexpr double pi() { return M_PI; }
 // Constants Section !!!
 // TODO: Set the timestep length and duration
 //-----
-size_t N = 100;    // 75   40
-double dt = 0.03; //  .05   .05
+size_t N = 25;    // 16(@60) 50 (@50mph)  50  100 75   40
+double dt = 0.03; // .05    .02          .03 .03  .05   .05
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -35,7 +35,7 @@ const double Lf = 2.67;
 // NOTE: feel free to play around with this
 // or do something completely different
 // Reference Car Velocity in mph
-double ref_v = 20;
+double ref_v = 60;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -74,7 +74,7 @@ public:
       // any anything you think may be beneficial.
       // The part of the cost based on the reference state.
       for (int t = 0; t < N; t++) {
-          fg[0] += CppAD::pow(vars[cte_start + t], 2);
+          fg[0] += 2*CppAD::pow(vars[cte_start + t], 2);
           fg[0] += CppAD::pow(vars[epsi_start + t], 2);
           fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
       }
@@ -87,7 +87,8 @@ public:
       
       // Minimize the value gap between sequential actuations.
       for (int t = 0; t < N - 2; t++) {
-          fg[0] += 250 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+          //fg[0] += 250 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+          fg[0] += 600000 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
           fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
       }
       
@@ -131,7 +132,7 @@ public:
           
           // THIS IS UNIQUE _ WHERE DID THIS COME FROM?? CHECK PSIDES0!!!!!!!
           AD<double> f0 = coeffs[0] + coeffs[1]*x0 + coeffs[2]*x0*x0 + coeffs[3]*x0*x0*x0;
-          AD<double> psides0 = CppAD::atan(coeffs[1]);
+          AD<double> psides0 = CppAD::atan(coeffs[1] + 2.0*coeffs[2]*x0 + 3.0*coeffs[3]*x0*x0);
           
           // Here's `x` to get you started.
           // The idea here is to constraint this value to be 0.
@@ -293,7 +294,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   options += "Sparse  true        reverse\n";
   // NOTE: Currently the solver has a maximum time limit of 0.5 seconds.
   // Change this as you see fit.
-  options += "Numeric max_cpu_time          0.5\n";
+  options += "Numeric max_cpu_time          1.0\n";
 
   // place to return solution
   CppAD::ipopt::solve_result<Dvector> solution;

@@ -1,3 +1,12 @@
+//----------
+// Main module for Model Prediction Controller (MPC) Project. This module talks to the Udacity simulator and receives data
+// back from the Simulator's vehicle through WebSocket messages. This was adapted from starter code from
+// Udacity which I modified to handle the results of the "telemetry" message.
+//
+// State Vector for this model is: [px, py, psi, v, cte, epsi]
+//
+// NoteX: Throttle value currently fixed. Follow-on suggestion to make this in a P loop as well
+//----------
 #include <math.h>
 #include <uWS/uWS.h>
 #include <chrono>
@@ -9,70 +18,64 @@
 #include "MPC.h"
 #include "json.hpp"
 
-#include "utils.hpp"
+#include "utils.hpp" // My library of helper functions for this project
 
 // for convenience
-using json = nlohmann::json;
+using namespace std;
 using namespace Eigen;
-
-// For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-//double deg2rad(double x) { return x * pi() / 180.0; }
-//double rad2deg(double x) { return x * 180.0 / pi(); }
+using json = nlohmann::json;
 
 
 //----------
 //  Helper Method Section
-//
-//
 //----------
 
 // Checks if the SocketIO event has JSON data.  If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
 string hasData(string s) {
-  auto found_null = s.find("null");
-  auto b1 = s.find_first_of("[");
-  auto b2 = s.rfind("}]");
-  if (found_null != string::npos) {
+    auto found_null = s.find("null");
+    auto b1 = s.find_first_of("[");
+    auto b2 = s.rfind("}]");
+    if (found_null != string::npos) {
+        return "";
+    } else if (b1 != string::npos && b2 != string::npos) {
+        return s.substr(b1, b2 - b1 + 2);
+    }
     return "";
-  } else if (b1 != string::npos && b2 != string::npos) {
-    return s.substr(b1, b2 - b1 + 2);
-  }
-  return "";
 }
 
 // Evaluate a polynomial.
 double polyeval(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * pow(x, i);
-  }
+    double result = 0.0;
+    for (int i = 0; i < coeffs.size(); i++) {
+        result += coeffs[i] * pow(x, i);
+    }
   return result;
 }
 
 // Fit a polynomial.
 // Adapted from https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
 Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order) {
-  assert(xvals.size() == yvals.size());
-  assert(order >= 1 && order <= xvals.size() - 1);
-  Eigen::MatrixXd A(xvals.size(), order + 1);
+    assert(xvals.size() == yvals.size());
+    assert(order >= 1 && order <= xvals.size() - 1);
+    Eigen::MatrixXd A(xvals.size(), order + 1);
 
-  for (int i = 0; i < xvals.size(); i++) {
-    A(i, 0) = 1.0;
-  }
-
-  for (int j = 0; j < xvals.size(); j++) {
-    for (int i = 0; i < order; i++) {
-      A(j, i + 1) = A(j, i) * xvals(j);
+    for (int i = 0; i < xvals.size(); i++) {
+        A(i, 0) = 1.0;
     }
-  }
 
-  auto Q = A.householderQr();
-  auto result = Q.solve(yvals);
-  return result;
+    for (int j = 0; j < xvals.size(); j++) {
+        for (int i = 0; i < order; i++) {
+            A(j, i + 1) = A(j, i) * xvals(j);
+        }
+    }
+    auto Q = A.householderQr();
+    auto result = Q.solve(yvals);
+    return result;
 }
 
 
+//?
 void WorldToVehicleTransform(const double &x_wrld, const double &y_wrld, const double &theta_wrld,
                              const double &x_in,   const double &y_in, double &x_out, double &y_out) {
     
@@ -99,44 +102,11 @@ void WorldToVehicleTransform(const double &x_wrld, const double &y_wrld, const d
     x_out = x_in*cos_t - y_in*sin_t - x_wrld;
     y_out = x_in*sin_t + y_in*cos_t - y_wrld;
     */
-    
-    
-    
     return;
     
 }
 
-// Method to convert the planned path (waypoints) from map space to vehicle space
-
-void ConvertMapWaypointsToVehicleCoord(vector<double> &ptsx, vector<double> &ptsy, const double &theta_wrld,
-                    const double &x_in, const double &y_in, vector<double> &ptsx_v, vector<double> &ptsy_v) {
-    
-    double ptsx_v_point, ptsy_v_point;   // Planned path point (x,y) in vehicle space
-    
-    
-    // Pre-compute rotation
-    double theta = -(theta_wrld + pi()); // In Map Space x-axis points down, in Vehicle Space x-axis points straight up. Also
-                                         // by negative rotate, y-axis points to left which is correct for vehicle orientation
-    double cos_t = cos(theta);
-    double sin_t = sin(theta);
-   
-    for (int i=0; i<ptsx.size(); i++) {
-    
-        // Align origin to vehicle center
-        double delta_x = x_in - ptsx[i];
-        double delta_y = y_in - ptsy[i];
-    
-        // Compute transform
-        ptsx_v_point = delta_x*cos_t - delta_y*sin_t;
-        ptsy_v_point = delta_x*sin_t + delta_y*cos_t;
-        
-        // Add to output vector
-        ptsx_v.push_back(ptsx_v_point);
-        ptsy_v.push_back(ptsy_v_point);
-    }
-}
-
-
+//?
 void VehicleToWorld(const double &xvehicle_wrld, const double &yvehicle_wrld, const double &thetavehicle_wrld,
                     const double &x_in, const double &y_in, double &x_out, double &y_out) {
     
@@ -174,23 +144,18 @@ void VehicleToWorld(const double &xvehicle_wrld, const double &yvehicle_wrld, co
 int main() {
   
     uWS::Hub h;
-    MPC mpc;  // MPC CLASS is initialized here!
-    int iters = 20;
+    MPC mpc;    // MPC CLASS is initialized here!
     
     //-----
     // Message Handler Section before start
-    //  onMessage is triggered each time the Udacity Simulator sends data through WebSocket
-    //----
+    //-----
     
-    // Message hook & processing from Udacity Simulator
-    h.onMessage([&mpc,&iters](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
-        
-        //int iters = 5;
-        
+    // onMessage is triggered each time the Udacity Simulator Server sends data through WebSocket
+    h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+    
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message. The 2 signifies a websocket event
         string sdata = string(data).substr(0, length);
-        //cout << sdata << endl;
         if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
             string s = hasData(sdata);
             if (s != "") {
@@ -208,118 +173,42 @@ int main() {
                     double v = j[1]["speed"];            // Vehicle speed (mph) orientation in map space
 
                     // 1. Convert Planned Path line (Waypoints) from World/Map space to Vehicle space
-                    vector<double> ptsx_v = {};
-                    vector<double> ptsy_v = {};
-                    //Eigen::VectorXd  ptsx_v;
-                    //Eigen::VectorXd  ptsy_v;
-                    //ptsx_v.resize(ptsx.size());
-                    //ptsy_v.resize(ptsx.size());
+                    vector<double> ptsx_v;  // Waypoints x in vehicle space
+                    vector<double> ptsy_v;  // Waypoints y in vehicle space
+                    
+                    // Converts waypoints to vehicle space with vehicle angle
                     ConvertMapWaypointsToVehicleCoord(ptsx,ptsy,psi,px,py,ptsx_v,ptsy_v);
 
                     
-                    // 2. Fit a smooth polynomial to planned path (in vehicle coords now)
-                    //Eigen::VectorXd  ptsx_v_plan;
-                    //Eigen::VectorXd  ptsy_v_plan;
-                    
-                    //Eigen::VectorXd ptsx_v_plan(ptsx_v.data());  // Convert vector data to Eigen::VectorXd
-                    //Eigen::VectorXd ptsy_v_plan(ptsy_v.data());
-                    
-                    //double * ptrx = &ptsx[0];
-                    //Eigen::Map<Eigen::VectorXd> ptsx_v_plan(ptsx_v, ptsx_v.size());
-                    
-                    /*
-                    for (int i=0; i<ptsx_v.size(); i++) {
-                        ptsx_v_plan.addTo(ptsx_v[i]);
-                        ptsy_v_plan.addTo(ptsy_v[i]);
-                    }
-                    */
+                    // 2. Fit a smooth polynomial (3rd order) to planned path (in vehicle coords now)
+                    // This is a trick to convert a <vector> to Eigen::VectorXd for poly fit (from discussion board)
                     double *ptrx = &ptsx_v[0];
                     double *ptry = &ptsy_v[0];
-                    
                     Eigen::Map<Eigen::VectorXd> ptsx_transform(ptrx, ptsx_v.size());
                     Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, ptsx_v.size());
-                     
-                    
                     auto coeffs = polyfit(ptsx_transform,ptsy_transform,3);
-                    cout << "Main: coeffs=" << coeffs << endl;
-                    //Eigen::VectorXd coeffs = polyfit(ptsx_v_plan,ptsy_v_plan,3);
                     
-                    // 3. Prepare data for Model Prediction C solver
-                    // New code
-                    //Need to covert vector<double> to Eigen::VectorXdEigen::VectorXd coeffs;
-                    //auto coeffs = polyfit(<#Eigen::VectorXd xvals#>, <#Eigen::VectorXd yvals#>, <#int order#>)(ptsx, ptsy, 2);
-                    
-                    
-                    //double y2 = polyeval(coeffs,px);
-                    //cout << "Main: py=" << py << " y2=" << y2 << endl;
-                    //double cte = polyeval(coeffs, px) - py;
-                    double cte = polyeval(coeffs, 0);
-                    //double epsi = psi - atan(coeffs[1]);
-                    double epsi = -atan(coeffs[1]);
+            
+                    // 3. Prepare data for Model Prediction Control (MPC) Solver
+                    // Need cross track error (cte) and steering angle error (epsi)
+                    double cte = polyeval(coeffs, 0);  // cte is vehicle location at x=0 of polyfit
+                    double epsi = -atan(coeffs[1]);    // !!!FINISH
                     cout << "Main: cte=" << cte << " epsi=" << epsi << endl;
                     
-                    
+                    // Load state vector for MPC solver (in vehicle coordinates which has x,y=0 & angle=0 by def.)
                     Eigen::VectorXd state(6);
-                    //state << px, py, psi, v, cte, epsi;
-                    state << 0, 0, 0, v, cte, epsi;
-                    //state << px, py, psi, v, cte, epsi;
+                    state << 0, 0, 0, v, cte, epsi;  // state << px, py, psi, v, cte, epsi;
                     
-                    std::vector<double> x_vals = {state[0]};
-                    std::vector<double> y_vals = {state[1]};
-                    std::vector<double> psi_vals = {state[2]};
-                    std::vector<double> v_vals = {state[3]};
-                    std::vector<double> cte_vals = {state[4]};
-                    std::vector<double> epsi_vals = {state[5]};
-                    std::vector<double> delta_vals = {};
-                    std::vector<double> a_vals = {};
+                    // Call MPC Solver!
+                    auto vars = mpc.Solve(state, coeffs);
                     
-                    //TODO: Calculate steering angle and throttle using MPC. Both are in between [-1, 1].
-                    double steer_value;
-                    double throttle_value;
-
-
-                   // for (size_t i = 0; i < iters; i++) {
-                        //std::cout << "Main: Iteration " << i << std::endl;
-                        
-                        
-                        auto vars = mpc.Solve(state, coeffs);
+                    // vars returned: actuations adjust: vars[0] = delta, vars[1] = a
+                    // then, vars[2]=x, vars[3]=y, vars[4]=psi, vars[5]=v, vars[6]=cte, vars[7]=epsi
+                    // Calculate steering angle and throttle using MPC. Both are in between [-1, 1].
+                    double steer_value = -vars[0]/(deg2rad(25));  // Normalize by max angle & mult by -1 because turn is reversed in simulator
+                    double throttle_value = vars[1];
+                    cout << "Main: MPC solution, steer adjust=" << steer_value << " throttle=" << throttle_value << endl;
                     
-                    /*
-                        x_vals.push_back(vars[0]);
-                        y_vals.push_back(vars[1]);
-                        psi_vals.push_back(vars[2]);
-                        v_vals.push_back(vars[3]);
-                        cte_vals.push_back(vars[4]);
-                        epsi_vals.push_back(vars[5]);
-                        
-                        delta_vals.push_back(vars[6]);
-                        a_vals.push_back(vars[7]);
-                        
-                        state << vars[0], vars[1], vars[2], vars[3], vars[4], vars[5];
-                         state << 0, 0, 0, vars[3], vars[4], vars[5];
-                        std::cout << "x = " << vars[0] << std::endl;
-                        std::cout << "y = " << vars[1] << std::endl;
-                        std::cout << "psi = " << vars[2] << std::endl;
-                        std::cout << "v = " << vars[3] << std::endl;
-                        std::cout << "cte = " << vars[4] << std::endl;
-                        std::cout << "epsi = " << vars[5] << std::endl;
-                        std::cout << "delta = " << vars[6] << std::endl;
-                        std::cout << "a = " << vars[7] << std::endl;
-                        std::cout << std::endl;
-                        
-                        //steer_value = vars[2];    // Update estimate for steer angle
-                        //throttle_value = vars[7];  // Udate estimate for throttle
-                        
-                     */
-                        steer_value = -vars[0]/(deg2rad(25));  // Multiply by -1 because turn in reverse in simulator
-                        throttle_value = vars[1];
-                        
-                        cout << "MPC: Sol steer=" << steer_value << " throttle=" << throttle_value << endl;
-                        
-                    //}
-
-                    //steer_value = -vars[0]/(deg2rad(25));
-                    //throttle_value = vars[1];
 
                     
                     json msgJson;
@@ -327,13 +216,18 @@ int main() {
                     // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
                     //steer_value = 0.0;
                     msgJson["steering_angle"] = steer_value;
-                    throttle_value = .1;
+                    //throttle_value = .1;
                     msgJson["throttle"] = throttle_value;
 
                     //Display the MPC predicted trajectory
                     vector<double> mpc_x_vals;
                     vector<double> mpc_y_vals;
-
+                    
+                    for (int i=2; i<vars.size(); i=i+2) {  // x & y pos are after the actuator values at the front of array
+                        mpc_x_vals.push_back(vars[i]);
+                        mpc_y_vals.push_back(vars[i+1]);
+                    }
+                    
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Green line
 
@@ -344,6 +238,7 @@ int main() {
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
 
+                    
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Yellow line
 
@@ -351,6 +246,15 @@ int main() {
                     msgJson["next_x"] = next_x_vals;
                     msgJson["next_y"] = next_y_vals;
                     */
+                    
+                    ptsx_v.clear();
+                    ptsy_v.clear();
+                    for (int i=1;i<40;i++ ) {
+                        ptsx_v.push_back(i*2.0);
+                        ptsy_v.push_back(polyeval(coeffs,i*2.0));
+                    }
+                    
+                    
                     msgJson["next_x"] = ptsx_v;
                     msgJson["next_y"] = ptsy_v;
 
