@@ -203,7 +203,7 @@ int main() {
                     auto vars = mpc.Solve(state, coeffs);
                     
                     // Calculate steering angle and throttle using MPC. Both are in between [-1, 1].
-                    double steer_value = -vars[0]/(deg2rad(25));  // Norma by max angle & mult by -1 bcause turn is reversed in sim
+                    double steer_value = -vars[0]/(deg2rad(25));  // Normalize by max angle & mult by -1 bcause turn is reversed in simulator
                     double throttle_value = vars[1];
                     cout << "Main: iter=" << count << " mpc:steer_value=" << steer_value << " throttle=" << throttle_value << endl;
                     
@@ -235,7 +235,7 @@ int main() {
                     msgJson["next_y"] = next_y_vals;
 
                     
-                    // #5. Save data for diagnostic plots
+                    // #5. Data for diagnostic plots
                     mpc.SaveData(ptsx,ptsy,px,py);
                     if (count == 450) mpc.PlotData();  // Diagnostic plots
                     
@@ -244,10 +244,8 @@ int main() {
                     // Message to Simulator Server
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
                     
-                    // Latency
-                    // The purpose is to mimic real driving conditions where the car does actuate the commands instantly.
-                    // Feel free to play around with this value but should be to drive around the track with 100ms latency.
-                    //
+                    // Latency - the purpose is to mimic real driving conditions where the car does NOT actuate the commands
+                    // instantly. This value should be set to drive around the track with 100ms latency.
                     // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE SUBMITTING.
                     this_thread::sleep_for(chrono::milliseconds(100));
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);

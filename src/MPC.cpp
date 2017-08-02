@@ -33,12 +33,12 @@
 #include <cppad/cppad.hpp>
 #include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
-//#include "Eigen-3.3/Eigen/QR"
+#include "Eigen-3.3/Eigen/QR"
 
 #include "utils.hpp"  // My utility library
 
-#include "matplotlibcpp.h"
-namespace plt = matplotlibcpp;
+//#include "matplotlibcpp.h"
+//namespace plt = matplotlibcpp;
 
 using CppAD::AD;
 
@@ -70,7 +70,14 @@ const double Lf = 2.67;
 // NOTE: feel free to play around with this
 // or do something completely different
 // Reference Car Velocity in mph
-double ref_v = 50;  // Up to 60 works
+const double ref_v = 50;  // Up to 60 works
+
+
+const double delta_w = 600000.0;
+const double cte_w   = 2.0;
+
+
+
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -117,7 +124,7 @@ public:
       // any anything you think may be beneficial.
       // The part of the cost based on the reference state.
       for (int t = 0; t < N; t++) {
-          fg[0] += 2*CppAD::pow(vars[cte_start + t], 2);
+          fg[0] += cte_w * CppAD::pow(vars[cte_start + t], 2);
           fg[0] += CppAD::pow(vars[epsi_start + t], 2);
           fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
       }
@@ -130,8 +137,7 @@ public:
       
       // Minimize the value gap between sequential actuations.
       for (int t = 0; t < N - 2; t++) {
-          //fg[0] += 250 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-          fg[0] += 600000 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+          fg[0] += delta_w * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
           fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
       }
       
@@ -173,7 +179,7 @@ public:
           AD<double> delta0 = vars[delta_start + t - 1];
           AD<double> a0 = vars[a_start + t - 1];
           
-          // THIS IS UNIQUE _ WHERE DID THIS COME FROM?? CHECK PSIDES0!!!!!!!
+          // THIS IS UNIQUE CHECK PSIDES0!!!!!!!
           AD<double> f0 = coeffs[0] + coeffs[1]*x0 + coeffs[2]*x0*x0 + coeffs[3]*x0*x0*x0;
           AD<double> psides0 = CppAD::atan(coeffs[1] + 2.0*coeffs[2]*x0 + 3.0*coeffs[3]*x0*x0);
           
@@ -193,7 +199,6 @@ public:
           //---
           // TODO: Setup the rest of the model constraints
           // Global Kinematic Model
-          // 2!!!!!
           fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
           fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
           fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
@@ -399,7 +404,7 @@ void MPC::SaveData(vector<double> &ptsx, vector<double> &ptsy, double &px, doubl
 
 
 //
-//
+// Not working because of some linking to python problem
 //
 void MPC::PlotData() {
     
@@ -416,7 +421,7 @@ void MPC::PlotData() {
     plt::subplot(3, 1, 3);
     plt::title("Velocity");
     plt::plot(v_vals);
-*/
+
     //plt::subplot(1, 1, 1);
     plt::title("Car Path in Simulator");
     plt::xlabel("X Pos");
@@ -425,5 +430,7 @@ void MPC::PlotData() {
     //plt::plot(px_sav,".-");
     
     plt::show();
+     
+     */
 }
 
