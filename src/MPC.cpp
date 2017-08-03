@@ -5,28 +5,20 @@
 //
 // State Vector for this model is: [px, py, psi, v, cte, epsi]
 //
-// NoteX: Throttle value currently fixed. Follow-on suggestion to make this in a P loop as well
-
 // Note: Since this is an event driven operation (i.e. process messages from the Udacity Simulator Server) and you have to pass
 // objects to the Websocket message handler, I have chosen to implement support routines like saving data, plotting data, etc.
 // as methods of the MPC class
 //
-//
 // Note: Important Constants for this code are as follows:
 //
-//size_t N = 25;    // 16(@60) 50 (@50mph)  50  100 75   40
-//double dt = 0.03; // .05    .02          .03 .03  .05   .05
+// size_t N = 25;     // 16(@60) 50 (@50mph)  50  100 75   40
+// double dt = 0.03;  // .05    .02          .03 .03  .05   .05
+//
 // This is the length from front to CoG that has a similar radius.
-//const double Lf = 2.67;
-
-// NOTE: feel free to play around with this
-// or do something completely different
+// const double Lf = 2.67;
+//
 // Reference Car Velocity in mph
-//double ref_v = 50;  // Up to 60 works
-//
-//
-//
-//
+// double ref_v = 50;  // Up to 60 works
 //----------
 #include "MPC.h"
 #include <math.h>
@@ -199,12 +191,12 @@ public:
           //---
           // TODO: Setup the rest of the model constraints
           // Global Kinematic Model
-          fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
-          fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-          fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
-          fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
-          fg[1 + cte_start + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
-          fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
+          fg[1 + x_start + t]    = x1 -    (x0 + v0 * CppAD::cos(psi0) * dt);
+          fg[1 + y_start + t]    = y1 -    (y0 + v0 * CppAD::sin(psi0) * dt);
+          fg[1 + psi_start + t]  = psi1 -  (psi0 + (v0/Lf) * delta0 * dt);
+          fg[1 + v_start + t]    = v1 -    (v0 + a0 * dt);
+          fg[1 + cte_start + t]  = cte1 -  (f0 - y0 + v0 * CppAD::sin(epsi0) * dt);
+          fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 + (v0/Lf) * delta0 * dt);
       }
 
   }

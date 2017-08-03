@@ -5,12 +5,9 @@
 //
 // State Vector for this model is: [px, py, psi, v, cte, epsi]
 //
-// NoteX: Throttle value currently fixed. Follow-on suggestion to make this in a P loop as well
-
 // Note: Since this is an event driven operation (i.e. process messages from the Udacity Simulator Server) and you have to pass
 // objects to the Websocket message handler, I have chosen to implement support routines like saving data, plotting data, etc.
 // as methods of the MPC class
-//
 //----------
 #include <math.h>
 #include <uWS/uWS.h>  // Websocket library
@@ -205,7 +202,7 @@ int main() {
                     // Calculate steering angle and throttle using MPC. Both are in between [-1, 1].
                     double steer_value = -vars[0]/(deg2rad(25));  // Normalize by max angle & mult by -1 bcause turn is reversed in simulator
                     double throttle_value = vars[1];
-                    cout << "Main: iter=" << count << " mpc:steer_value=" << steer_value << " throttle=" << throttle_value << endl;
+                    cout << "Main: it=" << count << " mpc:steer_value=" << steer_value << " throttle=" << throttle_value << endl;
                     
 
                     // #4. Calcs done. Load message for Simulator Server
