@@ -29,8 +29,8 @@
 
 #include "utils.hpp"  // My utility library
 
-//#include "matplotlibcpp.h"
-//namespace plt = matplotlibcpp;
+#include "matplotlibcpp.h"
+namespace plt = matplotlibcpp;
 
 using CppAD::AD;
 
